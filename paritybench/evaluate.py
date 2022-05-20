@@ -12,6 +12,7 @@ from torch.testing._internal.jit_utils import JitTestCase
 
 from paritybench.reporting import ErrorAggregatorDict, Stats
 from paritybench.utils import import_file, subproc_wrapper
+import numpy as np
 
 log = logging.getLogger(__name__)
 
@@ -25,6 +26,8 @@ class OnnxFailed(RuntimeError):
 class JitFailed(RuntimeError):
     pass
 
+class MDLAFailed(RuntimeError):
+    pass
 
 def evaluate_nn_module(nn_cls, get_init_args, get_forward_args, record_error, main_args):
     """
@@ -70,6 +73,21 @@ def evaluate_nn_module(nn_cls, get_init_args, get_forward_args, record_error, ma
         except Exception as e:
             record_error('export_onnx', e)
             raise OnnxFailed()
+
+    if main_args.mdla:
+        try:
+            onnx_path = "{}/{}.onnx".format(main_args.onnxdir, nn_cls.__name__)
+            torch.onnx.export(nn, *copy.deepcopy(tuple(args)), onnx_path)
+            main_args.ie.Compile(onnx_path)
+            dummy_input = copy.deepcopy(args[0])
+            dummy_input = np.ascontiguousarray(dummy_input.numpy())
+            mdla_result = main_args.ie.Run(dummy_input)
+
+        except Exception as e:
+            record_error('run mdla', e)
+            raise MDLAFailed()
+
+
     try:
         result3 = nn_script(*args, **kwargs)
 

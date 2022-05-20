@@ -46,6 +46,7 @@ def get_args():
     parser.add_argument("--no-fork", action="store_true", help="don't run *-one test in a subprocess")
     parser.add_argument("--memory-limit-gb", type=int, default=10)
 
+    parser.add_argument("--mdla", action="store_true", help="evaluate run on mdla")
     parser.add_argument("--onnxdir", type=str, help="dir where to export modules to onnx during evaluate")
     parser.add_argument("--download-dir", default="./paritybench_download", help="dir where to download project default: ./paritybench_download")
     parser.add_argument("--tests-dir", default="./generated", help="dir where to generate test scripts default: ./generated")
@@ -56,6 +57,10 @@ def main():
     assert sys.version_info >= (3, 8), "Python 3.8+ required, got: {}".format(sys.version)
     logging.basicConfig(level=logging.INFO)
     args = get_args()
+
+    if args.mdla:
+        import microndla
+        args.ie = microndla.MDLA()
 
     os.environ["RLIMIT_AS_GB"] = str(args.memory_limit_gb)
 
