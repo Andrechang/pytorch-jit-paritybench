@@ -12,6 +12,7 @@ from torch.testing._internal.jit_utils import JitTestCase
 
 from paritybench.reporting import ErrorAggregatorDict, Stats
 from paritybench.utils import import_file, subproc_wrapper
+from paritybench.compile import functorch_en, compile_functions
 
 log = logging.getLogger(__name__)
 
@@ -49,10 +50,18 @@ def evaluate_nn_module(nn_cls, get_init_args, get_forward_args, record_error, ma
     except Exception:
         pass
 
+    if not functorch_en: #if functorch not installed use default compile
+        main_args.compile_mode = 'torchscript'
+
     try:
-        nn_script = torch.jit.script(nn)
+        if main_args.compile_mode == 'fxgraph_draw':
+            graph_path = "{}/{}".format(main_args.tests_dir, nn_cls.__name__)
+            nn_script = compile_functions[main_args.compile_mode](nn, name=graph_path)
+        else:
+            nn_script = compile_functions[main_args.compile_mode](nn)
+
     except Exception as e:
-        record_error('compile', e)
+        record_error('compile {} '.format(main_args.compile_mode), e)
         raise JitFailed()
 
     try:

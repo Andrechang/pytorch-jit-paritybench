@@ -6,6 +6,7 @@ from functools import partial
 
 from paritybench.crawler import CrawlGitHub
 from paritybench.evaluate import evaluate_all, evaluate_pyfile_subproc
+from paritybench.compile import compile_functions
 from paritybench.generate import generate_all, generate_zipfile_subproc
 from paritybench.generate import write_helpers
 from paritybench.utils import subproc_wrapper, tempdir_wrapper
@@ -47,6 +48,7 @@ def get_args():
     parser.add_argument("--memory-limit-gb", type=int, default=10)
 
     parser.add_argument("--onnxdir", type=str, help="dir where to export modules to onnx during evaluate")
+    parser.add_argument("--compile_mode", default="torchscript", type=str, help="choose a mode of compilation: {}".format(list(compile_functions.keys())))
     parser.add_argument("--download-dir", default="./paritybench_download", help="dir where to download project default: ./paritybench_download")
     parser.add_argument("--tests-dir", default="./generated", help="dir where to generate test scripts default: ./generated")
     args = parser.parse_args()
