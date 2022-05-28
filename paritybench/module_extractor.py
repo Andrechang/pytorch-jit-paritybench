@@ -26,6 +26,13 @@ from .static_analysis import IMPORT_WHITELIST
 from .static_analysis import split_import
 from .utils import call_with_timeout
 
+try:
+    import torchdynamo
+    from paritybench.compile import compile_functions, torchdynamo_en
+except:
+    pass
+
+
 log = logging.getLogger(__name__)
 
 NN_MODULE_RE = re.compile(r"(\btorch\b)|(\bnn[.]Module\b)", re.MULTILINE)
@@ -280,7 +287,7 @@ class PyTorchModuleExtractor(object):
         try:
             stats, errors, testcases = call_with_timeout(
                 extract_nn_module,
-                args=(name, nn_cls, checker, self.errors.context),
+                args=(name, nn_cls, checker, self.errors.context, self.args),
                 timeout=300)
             self.errors.update(errors)
             self.stats.update(stats)
@@ -329,15 +336,15 @@ class PyTorchModuleExtractor(object):
             self.output.write(f"        self._check(*TESTCASES[{index}])\n\n")
 
 
-def extract_nn_module(name: str, nn_cls: type, checker, context):
+def extract_nn_module(name: str, nn_cls: type, checker, context, main_args):
     errors = ErrorAggregatorDict(context)
     stats = Stats()
     testcases = []
-    extract_nn_module_inner(name, nn_cls, checker, stats, errors, testcases)
+    extract_nn_module_inner(name, nn_cls, checker, stats, errors, testcases, main_args)
     return stats, errors, testcases
 
 
-def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, testcases):
+def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, testcases, main_args):
     """
         name: name of the module
         nn_cls: module class type
@@ -374,7 +381,15 @@ def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, tes
     stats["deduced_args_ok"] += 1
 
     try:
-        torch.jit.script(nn_module)
+        if main_args.compile_mode == 'torchscript':
+            torch.jit.script(nn_module)
+        elif main_args.compile_mode == 'fxgraph_draw':
+            graph_path = "{}/{}".format(main_args.tests_dir, nn_cls.__name__)
+            with torchdynamo.optimize(compile_functions[main_args.compile_mode](graph_path)):
+                nn_module(*forward_deducer.last_args, **forward_deducer.last_kwargs)
+        else:
+            with torchdynamo.optimize(compile_functions[main_args.compile_mode]):
+                nn_module(*forward_deducer.last_args, **forward_deducer.last_kwargs)
 
     except Exception as e:
         testcases.append((
