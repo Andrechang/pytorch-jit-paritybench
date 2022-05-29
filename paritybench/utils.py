@@ -75,7 +75,7 @@ def subproc_wrapper(path: str, fn: callable, timeout: int = 900):
     :return: errors, stats
     """
     log.info(f"Running {path}")
-    with tempfile.TemporaryDirectory(prefix="paritybench") as tempdir:
+    with tempfile.TemporaryDirectory(prefix="paritybench", dir='./tmp/') as tempdir:
         try:
             return call_with_timeout(fn, (tempdir, path), {}, timeout=timeout)
         except TimeoutError:
@@ -95,5 +95,5 @@ def subproc_wrapper(path: str, fn: callable, timeout: int = 900):
 def tempdir_wrapper(path: str, fn: callable):
     """ Non-forking version of subproc_wrapper """
     log.info(f"Running {path}")
-    with tempfile.TemporaryDirectory(prefix="paritybench") as tempdir:
+    with tempfile.TemporaryDirectory(prefix="paritybench", dir='./tmp/') as tempdir:
         return fn(tempdir, path)

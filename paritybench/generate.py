@@ -42,7 +42,20 @@ def generate_zipfile_subproc(tempdir: str, path: str, args):
         extractor.main(path)
     return errors, stats
 
-
+def generate_zipfile(tempdir: str, path: str, args):
+    '''
+    Args:
+        tempdir: temporary dir
+        path: input path process a .zip file from a github download
+    Returns: extractor object
+    '''
+    errors = ErrorAggregatorDict(path)
+    stats = Stats()
+    test_path = "{}/test_{}.py".format(args.tests_dir, re.sub(r"([.]zip|/)$", "", os.path.basename(path)))
+    with open(test_path, "w") as output_py:
+        extractor = PyTorchModuleExtractor(tempdir, errors, stats, output_py=output_py, args=args)
+        extractor.main(path)
+    return errors, stats, extractor
 
 
 def generate_all(args, download_dir, limit=None, jobs=4):

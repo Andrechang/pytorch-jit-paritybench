@@ -285,10 +285,11 @@ class PyTorchModuleExtractor(object):
         checker = CheckCallableMembers.run(self.name_to_ast.get(name)) # get modules inside module
 
         try:
-            stats, errors, testcases = call_with_timeout(
-                extract_nn_module,
-                args=(name, nn_cls, checker, self.errors.context, self.args),
-                timeout=300)
+            stats, errors, testcases = extract_nn_module(name, nn_cls, checker, self.errors.context, self.args)
+            # stats, errors, testcases = call_with_timeout(
+            #     extract_nn_module,
+            #     args=(name, nn_cls, checker, self.errors.context, self.args),
+            #     timeout=300)
             self.errors.update(errors)
             self.stats.update(stats)
             self.testcases.extend(testcases)
@@ -384,7 +385,7 @@ def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, tes
         if main_args.compile_mode == 'torchscript':
             torch.jit.script(nn_module)
         elif main_args.compile_mode == 'fxgraph_draw':
-            graph_path = "{}/{}".format(main_args.tests_dir, nn_cls.__name__)
+            graph_path = "{}/{}.png".format(main_args.tests_dir, nn_cls.__name__)
             with torchdynamo.optimize(compile_functions[main_args.compile_mode](graph_path)):
                 nn_module(*forward_deducer.last_args, **forward_deducer.last_kwargs)
         else:
