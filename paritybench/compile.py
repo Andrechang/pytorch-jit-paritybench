@@ -1,9 +1,14 @@
 import torch
+import torch.fx
+try:
+    from functorch.compile import compiled_module, draw_graph, draw_graph_compile
+except:
+    pass
+
 try:
     # you will need to install torchdynamo, functorch
     # see: https://github.com/pytorch/torchdynamo
     import torchdynamo
-    from functorch.compile import draw_graph
     from torchdynamo.optimizations import BACKENDS
     torchdynamo_en = True
 except:
@@ -26,10 +31,17 @@ def graph_drawer(name='graph'):
         return gm
     return f
 
+def functorch_draw(nn, name='graph'):
+    fw_compiler = draw_graph_compile(name+'.png')
+    bw_compiler = draw_graph_compile(name+'_bwd.png')
+    return compiled_module(nn, fw_compiler, bw_compiler)
+
 compile_functions = {
     'torchscript': torch.jit.script,
-    'fxgraph_draw': graph_drawer,
-    'my_compiler': my_compiler,
+    'functorch_draw': functorch_draw,
 }
 
-compile_functions.update(BACKENDS)
+if torchdynamo_en:
+    compile_functions['fxgraph_draw'] = graph_drawer
+    compile_functions['my_compiler'] = my_compiler
+    compile_functions.update(BACKENDS)

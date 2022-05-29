@@ -15,9 +15,9 @@ from paritybench.utils import import_file, subproc_wrapper
 
 try:
     import torchdynamo
-    from paritybench.compile import compile_functions, torchdynamo_en
 except:
     pass
+from paritybench.compile import compile_functions, torchdynamo_en
 
 log = logging.getLogger(__name__)
 

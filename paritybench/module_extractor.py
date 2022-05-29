@@ -28,10 +28,9 @@ from .utils import call_with_timeout
 
 try:
     import torchdynamo
-    from paritybench.compile import compile_functions, torchdynamo_en
 except:
     pass
-
+from paritybench.compile import compile_functions, torchdynamo_en
 
 log = logging.getLogger(__name__)
 
@@ -384,6 +383,10 @@ def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, tes
     try:
         if main_args.compile_mode == 'torchscript':
             torch.jit.script(nn_module)
+        elif main_args.compile_mode == 'functorch_draw':
+            graph_path = "{}/{}".format(main_args.tests_dir, nn_cls.__name__)
+            nn_script = compile_functions[main_args.compile_mode](nn_module, name=graph_path)
+            nn_script(*forward_deducer.last_args, **forward_deducer.last_kwargs)
         elif main_args.compile_mode == 'fxgraph_draw':
             graph_path = "{}/{}.png".format(main_args.tests_dir, nn_cls.__name__)
             with torchdynamo.optimize(compile_functions[main_args.compile_mode](graph_path)):
