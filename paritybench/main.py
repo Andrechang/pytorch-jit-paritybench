@@ -48,6 +48,7 @@ def get_args(raw_args=None):
     parser.add_argument("--memory-limit-gb", type=int, default=10)
 
     parser.add_argument("--onnxdir", type=str, help="dir where to export modules to onnx during evaluate")
+    parser.add_argument("--metrics", action="store_true", help="get metrics for modules")
     parser.add_argument("--compile_mode", default="torchscript", type=str, help="choose a mode of compilation: {}".format(list(compile_functions.keys())))
     parser.add_argument("--download-dir", default="./paritybench_download", help="dir where to download project default: ./paritybench_download")
     parser.add_argument("--tests-dir", default="./generated", help="dir where to generate test scripts default: ./generated")
@@ -61,7 +62,6 @@ def main(raw_args=None):
     assert sys.version_info >= (3, 8), "Python 3.8+ required, got: {}".format(sys.version)
     logging.basicConfig(level=logging.INFO)
     args = get_args(raw_args)
-
     os.environ["RLIMIT_AS_GB"] = str(args.memory_limit_gb)
 
     if args.download:

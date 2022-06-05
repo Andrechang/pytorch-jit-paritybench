@@ -12,12 +12,7 @@ from torch.testing._internal.jit_utils import JitTestCase
 
 from paritybench.reporting import ErrorAggregatorDict, Stats
 from paritybench.utils import import_file, subproc_wrapper
-
-try:
-    import torchdynamo
-except:
-    pass
-from paritybench.compile import compile_functions, torchdynamo_en
+from paritybench.compile import backend_execute, torchdynamo_en
 
 log = logging.getLogger(__name__)
 
@@ -80,16 +75,7 @@ def evaluate_nn_module(nn_cls, get_init_args, get_forward_args, record_error, ma
             raise OnnxFailed()
 
     try:
-        if nn_script:
-            result3 = nn_script(*args, **kwargs)
-        elif main_args.compile_mode == 'fxgraph_draw':
-            graph_path = "{}/{}".format(main_args.tests_dir, nn_cls.__name__)
-            with torchdynamo.optimize(compile_functions[main_args.compile_mode](graph_path)):
-                result3 = nn(*copy.deepcopy(args), **copy.deepcopy(kwargs))
-        else:
-            with torchdynamo.optimize(compile_functions[main_args.compile_mode]):
-                result3 = nn(*copy.deepcopy(args), **copy.deepcopy(kwargs))
-
+        result3, _ = backend_execute(nn, nn_cls, copy.deepcopy(args), copy.deepcopy(kwargs), main_args, nn_script=nn_script)
     except Exception as e:
         record_error('run_jit {} '.format(main_args.compile_mode), e)
         raise JitFailed()

@@ -30,7 +30,7 @@ try:
     import torchdynamo
 except:
     pass
-from paritybench.compile import compile_functions, torchdynamo_en
+from paritybench.compile import backend_execute
 
 log = logging.getLogger(__name__)
 
@@ -92,6 +92,7 @@ class PyTorchModuleExtractor(object):
 
         self.testcases = []
         self.args = args
+        self.metrics = {} # collect metrics for each module
 
     def search_file(self, filename: str, open_fn=open):
         """ get module from filename .py file """
@@ -284,14 +285,14 @@ class PyTorchModuleExtractor(object):
         checker = CheckCallableMembers.run(self.name_to_ast.get(name)) # get modules inside module
 
         try:
-            stats, errors, testcases = extract_nn_module(name, nn_cls, checker, self.errors.context, self.args)
-            # stats, errors, testcases = call_with_timeout(
-            #     extract_nn_module,
-            #     args=(name, nn_cls, checker, self.errors.context, self.args),
-            #     timeout=300)
+            stats, errors, testcases, metrs = call_with_timeout(
+                extract_nn_module,
+                args=(name, nn_cls, checker, self.errors.context, self.args),
+                timeout=300)
             self.errors.update(errors)
             self.stats.update(stats)
             self.testcases.extend(testcases)
+            self.metrics[name] = metrs
         except OSError as os:
             log.exception("test_nn_module OS error: {}".format(os))
             self.stats["module_crash"] += 1
@@ -340,11 +341,12 @@ def extract_nn_module(name: str, nn_cls: type, checker, context, main_args):
     errors = ErrorAggregatorDict(context)
     stats = Stats()
     testcases = []
-    extract_nn_module_inner(name, nn_cls, checker, stats, errors, testcases, main_args)
-    return stats, errors, testcases
+    metrics = {}
+    extract_nn_module_inner(name, nn_cls, checker, stats, errors, testcases, main_args, metrics)
+    return stats, errors, testcases, metrics
 
 
-def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, testcases, main_args):
+def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, testcases, main_args, metrics):
     """
         name: name of the module
         nn_cls: module class type
@@ -381,20 +383,8 @@ def extract_nn_module_inner(name: str, nn_cls: type, checker, stats, errors, tes
     stats["deduced_args_ok"] += 1
 
     try:
-        if main_args.compile_mode == 'torchscript':
-            torch.jit.script(nn_module)
-        elif main_args.compile_mode == 'functorch_draw':
-            graph_path = "{}/{}".format(main_args.tests_dir, nn_cls.__name__)
-            nn_script = compile_functions[main_args.compile_mode](nn_module, name=graph_path)
-            nn_script(*forward_deducer.last_args, **forward_deducer.last_kwargs)
-        elif main_args.compile_mode == 'fxgraph_draw':
-            graph_path = "{}/{}.png".format(main_args.tests_dir, nn_cls.__name__)
-            with torchdynamo.optimize(compile_functions[main_args.compile_mode](graph_path)):
-                nn_module(*forward_deducer.last_args, **forward_deducer.last_kwargs)
-        else:
-            with torchdynamo.optimize(compile_functions[main_args.compile_mode]):
-                nn_module(*forward_deducer.last_args, **forward_deducer.last_kwargs)
-
+        _, mtr = backend_execute(nn_module, nn_cls, forward_deducer.last_args, forward_deducer.last_kwargs, main_args)
+        metrics.update(mtr)
     except Exception as e:
         testcases.append((
             name,
